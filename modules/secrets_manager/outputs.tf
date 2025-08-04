@@ -1,3 +1,5 @@
 output "secret_string" {
-  value = data.aws_secretsmanager_secret_version.rds_password_version.secret_string
+  description = "The secret string"
+  value       = aws_secretsmanager_secret_version.main.secret_string
+  sensitive   = true
 }

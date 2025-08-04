@@ -7,3 +7,8 @@ output "container_name" {
   description = "The name of the container defined in the task"
   value       = var.container_name
 }
+
+output "container_port" {
+  description = "The port the container listens on"
+  value       = var.container_port
+}

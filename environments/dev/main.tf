@@ -57,11 +57,11 @@ module "nat_gateway_1" {
   env       = var.env
 }
 
-module "nat_gateway_2" {
-  source    = "../../modules/nat_gateway"
-  subnet_id = module.public_subnet_2.subnet_id
-  env       = var.env
-}
+# module "nat_gateway_2" {
+#   source    = "../../modules/nat_gateway"
+#   subnet_id = module.public_subnet_2.subnet_id
+#   env       = var.env
+# }
 
 module "public_route_table" {
   source       = "../../modules/route_table"
@@ -83,7 +83,7 @@ module "private_route_table_2" {
   source         = "../../modules/route_table"
   vpc_id         = module.vpc.vpc_id
   subnet_id      = module.private_subnet_2.subnet_id
-  nat_gateway_id = module.nat_gateway_2.nat_gateway_id
+  nat_gateway_id = module.nat_gateway_1.nat_gateway_id
   name           = "${var.env}-private-route-table-2"
 }
 
@@ -142,7 +142,7 @@ module "ecs_service_security_group" {
 variable "domain_name" {
   description = "The domain name for the website"
   type        = string
-  default     = "example.com" # CHANGE THIS TO YOUR DOMAIN
+  default     = "tech-study-t.xyz"
 }
 
 module "s3_website_bucket" {
@@ -151,14 +151,40 @@ module "s3_website_bucket" {
   env         = var.env
 }
 
+provider "aws" {
+  alias  = "us-east-1"
+  region = "us-east-1"
+}
+
 module "acm_certificate_cloudfront" {
   source      = "../../modules/acm"
   domain_name = var.domain_name
+  providers = {
+    aws = aws.us-east-1
+  }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in module.acm_certificate_cloudfront.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = module.route53_frontend_record.zone_id
 }
 
 resource "aws_acm_certificate_validation" "cloudfront_cert" {
-  certificate_arn         = module.acm_certificate_cloudfront.acm_certificate_arn
-  validation_record_fqdns = [for dvo in module.acm_certificate_cloudfront.domain_validation_options : dvo.resource_record_name]
+  provider             = aws.us-east-1
+  certificate_arn      = module.acm_certificate_cloudfront.acm_certificate_arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
 module "cloudfront_distribution" {
@@ -231,7 +257,7 @@ module "ecs_service" {
 # ------------------------------------------------------------------------------
 module "secrets_manager_rds_password" {
   source      = "../../modules/secrets_manager"
-  secret_name = "${var.env}/rds/password"
+  secret_name = "${var.env}/rds/pass"
 }
 
 module "rds_instance" {
