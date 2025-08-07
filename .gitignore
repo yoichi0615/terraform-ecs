@@ -25,5 +25,3 @@ override.tf.json
 
 etc
 environments/prd
-
-# Note: keep .terraform.lock.hcl *tracked* for dependency pinning
